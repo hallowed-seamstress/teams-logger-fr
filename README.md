@@ -1,5 +1,52 @@
 # Teams Caption Capture — local Windows app
 
+## Experimental: no-OCR version (`teams_caption_uia.py`)
+
+Reads caption text and speaker names straight from Teams through Windows UI Automation (the accessibility interface screen readers use). No Tesseract, no region selection, and the Teams window can be moved or covered. It uses the same transcript, TXT/DOCX/JSONL output and recovery logic as the OCR version.
+
+### Easiest: TeamsCaptionLogger.exe
+
+Double-click `TeamsCaptionLogger.exe`, press **Start**, and turn on live captions in the meeting. The window shows the transcript as it builds. Press **Stop** (or close the window) to finish; the Word file is written on stop. Transcripts go to `Documents\Teams Transcripts` unless you pick another folder with **Change folder…**. No Python or other installs are needed.
+
+Windows may show "Windows protected your PC" the first time because the exe isn't code-signed; choose **More info > Run anyway**, or ask IT to sign/allowlist it.
+
+To build the exe yourself (needs Python 3.11+), run from this folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build_exe.ps1
+```
+
+This runs the tests and writes `dist\TeamsCaptionLogger.exe` (about 18 MB). `teams_caption_gui.py` is the window; run it with Python to use the window without building.
+
+### Command-line version
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe teams_caption_uia.py --output C:\Transcripts
+```
+
+Turn on live captions in the meeting (**More > Language and speech > Show live captions**). Press **Ctrl+C** to stop and export.
+
+Example output from a test meeting (captions are exactly what Teams showed, including its recognition errors; unidentified participants appear as "Speaker 1", etc.):
+
+```text
+Teams caption transcript
+Timestamps are local screen-observation times, not audio timecodes.
+
+[2026-10-06T08:52:41-06:00] Stiefvater, Daniel
+OK. OK, is this working? Found caption ground control. It should, yeah.
+
+[2026-10-06T08:52:41-06:00] Speaker 1
+Oh, I still speak at 1:00.
+
+[2026-10-06T08:52:41-06:00] Stiefvater, Daniel
+So you're not as cool. So blah, blah blah blah. It might be a little bit of a delay that picks it up. But I don't know. This is for us. I think it will so. Oh yeah, I don't even hear in teams. Oh, you don't? OK, yeah. Alright, we'll we'll stop it for now.
+```
+
+Consecutive captions from the same speaker are joined into one paragraph; a new heading starts when the speaker changes or after an 8-second pause (`--gap`). The identical timestamps above are because this example was built from a single snapshot; in a live run each block is stamped when its first words appear. If it keeps saying "Waiting for Teams live captions", run `teams_caption_uia.py --dump` while captions are visible. This writes `teams_uia_dump.txt` so the caption-panel detection can be adjusted. The dump contains whatever Teams is showing, so review it before sharing.
+
+The rest of this README covers the original OCR version.
+
 Select a fixed rectangle containing Teams live captions. The app reads only that rectangle using local Tesseract OCR, joins caption cards into speaker blocks, and saves timestamped TXT and DOCX transcripts. No Teams API, bot, audio recording, meeting join, or cloud OCR. Installation needs downloads; capture works offline. No screenshots are saved.
 
 ## Included files
