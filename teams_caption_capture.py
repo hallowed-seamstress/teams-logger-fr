@@ -278,12 +278,44 @@ def atomic_text(path: Path, text: str):
     os.replace(temp, path)
 
 
+def safe_filename(text: str, limit=80) -> str:
+    """Windows-safe filename fragment. Dots are dropped too, since callers add
+    extensions with Path.with_suffix, which would treat them as one."""
+    text = re.sub(r'[<>:"/\\|?*.\x00-\x1f]+', ' ', text)
+    return re.sub(r'\s+', ' ', text).strip()[:limit].rstrip()
+
+
 class Output:
+    SUFFIXES = ('.txt', '.jsonl', '.docx')
+
     def __init__(self, folder: Path):
         folder.mkdir(parents=True, exist_ok=True)
-        self.base = folder / ('Teams_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f'))
+        self.stamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        self.base = folder / f'Teams_{self.stamp}'
         self.journal = self.base.with_suffix('.jsonl')
         self.docx_warning = ''
+        self.named = False
+
+    def name_after(self, title: str) -> bool:
+        """Rename this session's files to '<title>_<start time>'. Once only;
+        on failure (e.g. the .docx is open in Word) keeps the current name."""
+        name = safe_filename(title)
+        if self.named or not name:
+            return False
+        self.named = True
+        new_base = self.base.with_name(f'{name}_{self.stamp}')
+        moved = []
+        try:
+            for suffix in self.SUFFIXES:
+                if self.base.with_suffix(suffix).exists():
+                    os.replace(self.base.with_suffix(suffix), new_base.with_suffix(suffix))
+                    moved.append(suffix)
+        except OSError:
+            for suffix in moved:
+                os.replace(new_base.with_suffix(suffix), self.base.with_suffix(suffix))
+            return False
+        self.base, self.journal = new_base, new_base.with_suffix('.jsonl')
+        return True
 
     def save(self, transcript: Transcript):
         # Clean TXT is atomically refreshed to permit correction of an evolving

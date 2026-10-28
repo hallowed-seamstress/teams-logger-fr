@@ -12,6 +12,8 @@ if ($LASTEXITCODE) { throw 'Tests failed; not building.' }
 # mss/Pillow are only used by the OCR version; leaving them out keeps the exe smaller.
 & $python -m PyInstaller --noconfirm --clean --onefile --windowed `
     --name TeamsCaptionLogger `
+    --icon teams_caption_icon.ico `
+    --add-data 'teams_caption_icon.ico;.' `
     --collect-all uiautomation `
     --collect-data docx `
     --exclude-module PIL --exclude-module mss `

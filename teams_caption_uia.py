@@ -94,9 +94,23 @@ def teams_windows(auto):
             if TEAMS_TITLE in (w.Name or '') or (w.ClassName or '').startswith('TeamsWebView')]
 
 
+TEAMS_VIEWS = {'Activity', 'Chat', 'Teams', 'Calendar', 'Calls', 'Files', 'Apps', 'OneDrive',
+               'Meeting compact view', 'Meeting', 'Call'}
+
+
+def meeting_name(window_title: str) -> str:
+    """'Weekly sync | Microsoft Teams' -> 'Weekly sync'. Skips view names such
+    as 'Chat | ...' when the meeting is docked in the main window."""
+    parts = [p.strip() for p in window_title.split('|')]
+    if TEAMS_TITLE in parts:
+        parts = parts[:parts.index(TEAMS_TITLE)]
+    return next((p for p in parts if p and p not in TEAMS_VIEWS), '')
+
+
 def find_caption_container(auto):
     """Breadth-first within Teams' web content, so the outermost caption region
-    wins over inner labels and native window chrome is ignored."""
+    wins over inner labels and native window chrome is ignored.
+    Returns (window, container) or (None, None)."""
     for window in teams_windows(auto):
         frontier = [(window, False)]
         while frontier:
@@ -105,10 +119,10 @@ def find_caption_container(auto):
                 for child in control.GetChildren():
                     web = in_web or child.ControlTypeName == 'DocumentControl'
                     if web and is_caption_container(child):
-                        return child
+                        return window, child
                     next_frontier.append((child, web))
             frontier = next_frontier
-    return None
+    return None, None
 
 
 def dump(auto, path: Path):
@@ -136,6 +150,7 @@ class CaptionLogger:
         self.container = None
         self.last_search = self.last_seen = 0.0
         self.last_docx = time.monotonic()
+        self.renamed = False  # set when files take the meeting's name; caller may reset
 
     @property
     def connected(self) -> bool:
@@ -148,9 +163,15 @@ class CaptionLogger:
             self.container = None  # alive but empty: Teams may have rebuilt the panel
         if self.container is None and began - self.last_search >= 2:
             self.last_search = began
-            self.container = find_caption_container(self.auto)
+            try:
+                window, self.container = find_caption_container(self.auto)
+                title = (window.Name or '') if window else ''
+            except Exception:  # transient COM failure while Teams rebuilds its tree
+                self.container, title = None, ''  # (e.g. EVENT_E_ALL_SUBSCRIBERS_FAILED)
             if self.container is not None:
                 self.last_seen = began
+                if self.output.name_after(meeting_name(title)):
+                    self.renamed = True
         changed = False
         if self.container is not None:
             try:
@@ -186,6 +207,9 @@ def run(auto, args):
                 for block in blocks[printed:-1]:
                     print(f'\n[{block.start}] {block.speaker}\n{block.text}')
                 printed = max(printed, len(blocks) - 1)
+            if logger.renamed:
+                logger.renamed = False
+                print(f'Meeting found; saving to {logger.output.base}.txt')
             if logger.connected != was_connected:
                 was_connected = logger.connected
                 print('Found live captions.' if was_connected else 'Lost live captions; searching...')

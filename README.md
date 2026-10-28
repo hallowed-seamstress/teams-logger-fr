@@ -45,6 +45,8 @@ So you're not as cool. So blah, blah blah blah. It might be a little bit of a de
 
 Consecutive captions from the same speaker are joined into one paragraph; a new heading starts when the speaker changes or after an 8-second pause (`--gap`). The identical timestamps above are because this example was built from a single snapshot; in a live run each block is stamped when its first words appear. If it keeps saying "Waiting for Teams live captions", run `teams_caption_uia.py --dump` while captions are visible. This writes `teams_uia_dump.txt` so the caption-panel detection can be adjusted. The dump contains whatever Teams is showing, so review it before sharing.
 
+Files are named after the meeting and the time you pressed Start, e.g. `Weekly sync_2026-10-06_08-50-12.txt` (plus `.docx` and `.jsonl`). Until live captions are found they are saved as `Teams_DATE_TIME`, then renamed once the meeting window is known.
+
 The rest of this README covers the original OCR version.
 
 Select a fixed rectangle containing Teams live captions. The app reads only that rectangle using local Tesseract OCR, joins caption cards into speaker blocks, and saves timestamped TXT and DOCX transcripts. No Teams API, bot, audio recording, meeting join, or cloud OCR. Installation needs downloads; capture works offline. No screenshots are saved.
@@ -154,7 +156,7 @@ Remove a selected avatar gutter, or change the new-block pause threshold:
 Recover clean files from an interrupted session's journal:
 
 ```powershell
-.\.venv\Scripts\python.exe teams_caption_capture.py --recover "C:\Transcripts\Teams_2026-10-01_15-21-15_123456.jsonl"
+.\.venv\Scripts\python.exe teams_caption_capture.py --recover "C:\Transcripts\Teams_2026-10-01_15-21-15.jsonl"
 ```
 
 This creates `_recovered.txt` and `_recovered.docx` beside the journal. An incomplete last JSONL line is ignored. Recovery does not require screen capture or Tesseract.

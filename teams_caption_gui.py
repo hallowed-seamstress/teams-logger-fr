@@ -40,6 +40,10 @@ class App:
         self.last_file = None
 
         root.title('Teams Caption Logger')
+        # Bundled next to the code by PyInstaller (--add-data); beside the script otherwise.
+        icon = Path(getattr(sys, '_MEIPASS', Path(__file__).parent)) / 'teams_caption_icon.ico'
+        if icon.exists():
+            root.iconbitmap(default=str(icon))  # default= also covers message boxes and dialogs
         root.geometry('720x480')
         root.minsize(480, 300)
         top = ttk.Frame(root, padding=(12, 12, 12, 4))
@@ -121,6 +125,9 @@ class App:
                 while not self.stop_event.is_set():
                     if logger.step():
                         self.events.put(('text', logger.transcript.render()))
+                    if logger.renamed:
+                        logger.renamed = False
+                        self.events.put(('file', output.base.with_suffix('.txt')))
                     if logger.connected != connected:
                         connected = logger.connected
                         self.events.put(('status', 'Recording live captions. Transcript saves automatically as you go.'
@@ -157,6 +164,9 @@ class App:
                 kind, value = self.events.get_nowait()
                 if kind == 'text':
                     self.set_preview(value)
+                elif kind == 'file':
+                    self.last_file = value
+                    self.show_folder()
                 elif kind == 'status':
                     self.status.set(value)
                 elif kind == 'error':

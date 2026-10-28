@@ -1,9 +1,11 @@
 """Run: python -m unittest -v test_caption_uia.py (no Teams needed)."""
+import tempfile
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 
-from teams_caption_capture import Transcript
-from teams_caption_uia import Node, extract_cards
+from teams_caption_capture import Output, Transcript
+from teams_caption_uia import Node, extract_cards, meeting_name
 
 
 def text(value):
@@ -54,6 +56,26 @@ class UiaParseTests(unittest.TestCase):
             item('Grogan, John', 'We need to review the foundations.')])), now)
         self.assertEqual(len(transcript.blocks), 1)
         self.assertEqual(transcript.blocks[0].text, 'We need to review the foundations.')
+
+
+class NamingTests(unittest.TestCase):
+    def test_meeting_name_from_window_title(self):
+        self.assertEqual(meeting_name('Wang, Aurora C | Microsoft Teams'), 'Wang, Aurora C')
+        self.assertEqual(meeting_name('Chat | Richardson, Connor | Microsoft Teams'), 'Richardson, Connor')
+        self.assertEqual(meeting_name('Microsoft Teams'), '')
+
+    def test_files_renamed_after_meeting(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Output(Path(folder))
+            transcript = Transcript()
+            output.save(transcript)
+            self.assertTrue(output.name_after('Q3 review: site/plan v1.2'))
+            self.assertEqual(output.base.name, f'Q3 review site plan v1 2_{output.stamp}')
+            self.assertEqual(sorted(p.name for p in Path(folder).iterdir()),
+                             [output.base.name + '.jsonl', output.base.name + '.txt'])
+            self.assertFalse(output.name_after('Other'))  # once only
+            output.save(transcript)
+            self.assertEqual(len(list(Path(folder).iterdir())), 2)
 
 
 if __name__ == '__main__':
